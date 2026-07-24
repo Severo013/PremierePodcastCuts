@@ -22,7 +22,7 @@ O MVP não aplica fades, tratamento de áudio nem exportação automática.
 
 ## Requisitos de desenvolvimento
 
-- Adobe Premiere 25.6 ou superior;
+- Adobe Premiere 26.3 ou superior, conforme `manifest.json`;
 - UXP Developer Tool 2.2 ou superior;
 - Visual Studio Code;
 - Developer Mode habilitado no Premiere;
@@ -45,14 +45,13 @@ Developer Tool para recarregar o painel.
 1. Abra o painel no Premiere.
 2. Clique em `Selecionar JSON` e selecione `samples/cuts.example.json`.
 3. Clique em `Selecionar MP4` e escolha um vídeo de teste.
-4. Confirme que o painel mostra os dois nomes e habilita `Criar master`.
-5. Abra um projeto no Premiere.
-6. Clique em `Criar master` e confira no log se a mídia foi reutilizada ou
-   importada e se a sequência master foi criada.
+4. Confirme que o painel mostra os dois nomes e habilita `Criar primeiro corte`.
+5. Abra o projeto que já contém a master validada na Fase 4.
+6. Clique em `Criar primeiro corte` e confira o relatório de duração no log.
 
-Nesta fase, o botão pode importar o MP4 e cria uma sequência
-`00_MASTER - <projectName>` no bin raiz. Ele ainda não cria as sequências de corte
-e não salva o projeto automaticamente.
+Nesta fase, o botão usa a sequência `00_MASTER - <projectName>` existente para
+criar apenas `01 - <nome do primeiro corte>`. Os demais itens de `cuts` não são
+processados, e o projeto não é salvo automaticamente.
 
 ## Executar os testes de domínio
 

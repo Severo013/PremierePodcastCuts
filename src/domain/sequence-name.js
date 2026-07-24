@@ -14,6 +14,11 @@ function createMasterSequenceName(projectName) {
   return `00_MASTER - ${sanitizeSequenceName(projectName)}`;
 }
 
+function createCutSequenceName(cutName, cutNumber = 1) {
+  const prefix = String(cutNumber).padStart(2, "0");
+  return `${prefix} - ${sanitizeSequenceName(cutName)}`;
+}
+
 function hasSequenceNameConflict(sequenceNames, expectedName) {
   const normalizedExpectedName = expectedName.toLowerCase();
   return sequenceNames.some(
@@ -22,6 +27,7 @@ function hasSequenceNameConflict(sequenceNames, expectedName) {
 }
 
 module.exports = {
+  createCutSequenceName,
   createMasterSequenceName,
   hasSequenceNameConflict,
   sanitizeSequenceName,

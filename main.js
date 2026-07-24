@@ -4,7 +4,7 @@ const {
 } = require("./src/infrastructure/file-picker");
 const { parseCutsJson } = require("./src/domain/cuts-parser");
 const {
-  createMasterSequence,
+  createFirstCutSequence,
 } = require("./src/infrastructure/premiere-adapter");
 const {
   PHASES,
@@ -54,7 +54,7 @@ function formatDuration(seconds) {
 
 function getStatusText(currentState) {
   if (currentState.phase === PHASES.RUNNING) {
-    return "Criando a sequência master...";
+    return "Criando somente o primeiro corte...";
   }
 
   if (currentState.phase === PHASES.ERROR) {
@@ -62,7 +62,7 @@ function getStatusText(currentState) {
   }
 
   if (currentState.phase === PHASES.READY) {
-    return "JSON e vídeo selecionados. Pronto para criar a master.";
+    return "JSON e vídeo selecionados. Pronto para criar o primeiro corte.";
   }
 
   if (currentState.phase === PHASES.PARTIAL) {
@@ -171,25 +171,27 @@ async function handleCreateCuts() {
       return;
     }
 
-    const result = await createMasterSequence(
-      state.videoInput.nativePath,
+    const result = await createFirstCutSequence(
       state.jsonInput.projectName,
+      state.jsonInput.cuts[0],
     );
     state = finishExecution(state, [
-      `Projeto ativo: ${result.projectName}.`,
-      result.imported
-        ? `Mídia importada: ${result.itemName}.`
-        : `Mídia já existente reutilizada: ${result.itemName}.`,
-      `Caminho confirmado: ${result.mediaPath}.`,
-      `Sequência master criada: ${result.masterSequenceName}.`,
+      "Relatório: 1 corte solicitado; 1 corte criado.",
+      `Master de origem: ${result.masterSequenceName}.`,
+      `Sequência criada: ${result.sequenceName}.`,
+      `Intervalo normalizado: ${formatDuration(result.alignedStartSeconds)} até ${formatDuration(result.alignedEndSeconds)}.`,
+      `Duração esperada: ${formatDuration(result.expectedDurationSeconds)}.`,
+      `Duração medida: ${formatDuration(result.actualDurationSeconds)}.`,
+      `Desvio medido: ${formatDuration(result.deviationSeconds)}.`,
+      `Zero point: ${formatDuration(result.zeroPointSeconds)}.`,
       "O projeto não foi salvo automaticamente.",
     ]);
   } catch (error) {
-    console.error("Falha ao criar a sequência master.", error);
+    console.error("Falha ao criar o primeiro corte.", error);
     state = withError(
       state,
-      [error.message || "Falha inesperada ao criar a sequência master."],
-      { logs: [...state.logs, "A criação da master falhou."] },
+      [error.message || "Falha inesperada ao criar o primeiro corte."],
+      { logs: [...state.logs, "A criação do primeiro corte falhou."] },
     );
   } finally {
     render();

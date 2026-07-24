@@ -126,49 +126,111 @@ método diretamente e aguarda sua `Promise`, sem chamar `Project.save()`.
 
 ### Pontos In/Out
 
-Confirmar:
-
-- classe que representa tempo;
-- criação a partir de segundos;
-- Action necessária;
-- unidade e precisão;
-- inclusão/exclusão do frame no ponto final.
+- tempo: `TickTime.createWithSeconds(seconds: number): TickTime`;
+- alinhamento: `TickTime.alignToNearestFrame(frameRate: FrameRate): TickTime`;
+- frame rate: `Sequence.getSettings(): Promise<SequenceSettings>` e `SequenceSettings.getVideoFrameRate(): FrameRate` (26.2+);
+- compatibilidade: o manifest exige Premiere 26.3, portanto essa assinatura está dentro da versão mínima carregável do plugin;
+- In: `Sequence.createSetInPointAction(tickTime: TickTime): Action`;
+- Out: `Sequence.createSetOutPointAction(tickTime: TickTime): Action`;
+- transação: `Project.executeTransaction(callback: (compoundAction: CompoundAction) => void, undoString?: string): boolean`;
+- nas versões atuais, toda Action deve ser criada dentro de
+  `Project.lockedAccess(callback: () => void): void`; a Action é criada e usada
+  por `executeTransaction` no mesmo callback síncrono;
+- precisão: início e fim são alinhados individualmente ao frame mais próximo;
+- inclusão/exclusão do frame no Out: pendente de prova manual com intervalo de dez segundos.
 
 ### Criação de subsequência
 
-Candidato: método de `Sequence`.
+- assinatura: `Sequence.createSubsequence(ignoreTrackTargeting?: boolean): Promise<Sequence>`;
+- uso: `await masterSequence.createSubsequence(true)` para ignorar track targeting;
+- rename: `Sequence.getProjectItem(): Promise<ProjectItem>` e `ProjectItem.createSetNameAction(name: string): Action`;
+- zero: `Sequence.createSetZeroPointAction(tickTime: TickTime): Action` está
+  documentado, mas foi considerado indisponível para esta prova após falhar no
+  runtime 26.3 com uma referência relocalizada;
+- medição: `Sequence.getEndTime(): Promise<TickTime>` e `Sequence.getZeroPoint(): Promise<TickTime>`;
+- inclusão sincronizada de vídeo/áudio e início efetivo do conteúdo em zero: pendentes de prova manual.
 
-Confirmar:
+### Recorte dos track items da subsequência
 
-- assinatura;
-- dependência de track targeting;
-- inclusão de áudio;
-- início da timeline;
-- comportamento com In/Out.
+- tracks: `Sequence.getVideoTrack(index): Promise<VideoTrack>` e
+  `Sequence.getAudioTrack(index): Promise<AudioTrack>`;
+- itens: `track.getTrackItems(Constants.TrackItemType.CLIP, false)`;
+- recorte de timeline: `createSetStartAction(tickTime: TickTime): Action` e
+  `createSetEndAction(tickTime: TickTime): Action`, disponíveis nos track items
+  de vídeo e áudio;
+- deslocamento: `createMoveAction(tickTime: TickTime): Action`, cujo argumento é
+  o deslocamento temporal; a prova usa `-startSeconds`;
+- cada item é relocalizado entre recorte e movimento para evitar reutilizar um
+  objeto do DOM invalidado pela transação anterior;
+- fonte oficial: classes `VideoClipTrackItem`, `AudioClipTrackItem` e o sample
+  oficial `premiere-api/src/sequence.ts`.
 
 ### Renomear sequência ou project item
 
-Confirmar:
-
-- objeto a renomear;
-- Action necessária;
-- transação;
-- retorno.
+- objeto: `ProjectItem` associado à sequência;
+- Action: `ProjectItem.createSetNameAction(name: string): Action`;
+- transação: `Project.executeTransaction(...)`;
+- retorno da Action: `Action`; retorno da transação: `boolean`.
+- o rename é criado dentro de `Project.lockedAccess`; a alteração do zero
+  point foi retirada após a limitação confirmada no runtime.
 
 ## Registro de decisão
 
 ### Estratégia escolhida
 
-- [ ] Estratégia A: master + subsequências
+- [x] Estratégia A revisada: subsequência da master + recorte dos track items
 - [ ] Estratégia B: sequência por corte + inserção da mídia
 
 ### Motivo
 
-Preencher após a prova da Fase 5.
+A prova inicial com In/Out temporários mostrou no runtime 26.3 que
+`createSubsequence(true)` cria a duração integral da master. A estratégia foi
+revisada: a subsequência ainda preserva as configurações da master, mas seus
+`VideoClipTrackItem` e `AudioClipTrackItem` são aparados com
+`createSetStartAction`/`createSetEndAction` e deslocados juntos para zero com
+`createMoveAction`. A master deixa de ter seu In/Out modificado.
 
 ### Limitações conhecidas
 
-Preencher após testes.
+- a inclusão do frame no ponto Out precisa ser medida no Premiere;
+- o recorte e deslocamento sincronizado dos track items de áudio e vídeo precisa
+  ser validado no runtime;
+- se a subsequência for criada e a transação de rename falhar, a API não oferece atomicidade entre as duas operações assíncronas.
+
+### Correção confirmada em teste da Fase 5
+
+O primeiro teste retornou `The script object is no longer valid` ao criar a
+Action de In/Out fora de `Project.lockedAccess`. Um segundo teste chegou a criar
+uma subsequência integral e invalidou a referência da nova `Sequence` antes da
+Action de zero point. O adapter passou a:
+
+- criar cada Action dentro do callback de `executeTransaction`, que por sua vez
+  permanece dentro de `lockedAccess`, seguindo o sample oficial `premiere-api`;
+- relocalizar `Sequence` por GUID depois de operações assíncronas;
+- criar os objetos `TickTime` dentro da transação;
+- reler e validar In/Out antes de chamar `createSubsequence`, abortando antes da
+  criação caso o Premiere não tenha aplicado o intervalo.
+
+O teste seguinte confirmou que, no runtime 26.3 instalado,
+`Project.getSequence(guid)` retorna uma Promise. Embora a página de referência
+não apresente o retorno de forma consistente, o sample oficial também usa
+`await project.getSequence(sequenceGuid)`. Todas as relocalizações por GUID no
+adapter são, portanto, aguardadas antes do acesso ao objeto retornado.
+
+O teste posterior confirmou que `Sequence.createSetZeroPointAction` lança
+`The script object is no longer valid` mesmo com a subsequência relocalizada por
+GUID imediatamente antes de `lockedAccess`. Como zerar a timeline é condicional
+à disponibilidade da API nesta fase, a prova deixou de modificar o zero point.
+O valor real continua sendo lido por `getZeroPoint()` e mostrado no relatório; a
+duração medida passou a ser `getEndTime() - getZeroPoint()`.
+
+Fontes oficiais:
+
+- `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/sequence`;
+- `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/sequenceeditor`;
+- `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/ticktime`;
+- `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project`;
+- `https://github.com/adobe/premierepro-types/blob/main/src/premierepro.d.ts`.
 
 ## Fontes oficiais
 

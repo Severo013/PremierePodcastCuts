@@ -1,5 +1,6 @@
 const app = require("premierepro");
 const {
+  createCutSequenceName,
   createMasterSequenceName,
   hasSequenceNameConflict,
 } = require("../domain/sequence-name");
@@ -135,4 +136,206 @@ async function createMasterSequence(mediaPath, projectName) {
   };
 }
 
-module.exports = { createMasterSequence };
+function executeActions(project, addActions, undoText) {
+  let executed = false;
+
+  project.lockedAccess(() => {
+    executed = project.executeTransaction((compoundAction) => {
+      addActions(compoundAction);
+    }, undoText);
+  });
+
+  if (!executed) {
+    throw new Error(`O Premiere recusou a transação: ${undoText}.`);
+  }
+}
+
+function findSequenceByName(sequences, expectedName) {
+  const normalizedName = expectedName.toLowerCase();
+  return sequences.find(
+    (sequence) => sequence.name.toLowerCase() === normalizedName,
+  );
+}
+
+async function getTrackItems(project, sequenceGuid, mediaType, trackIndex) {
+  const sequence = await project.getSequence(sequenceGuid);
+  const track = mediaType === "video"
+    ? await sequence.getVideoTrack(trackIndex)
+    : await sequence.getAudioTrack(trackIndex);
+  return await track.getTrackItems(app.Constants.TrackItemType.CLIP, false);
+}
+
+async function trimTrackGroup(
+  project,
+  sequenceGuid,
+  mediaType,
+  trackCount,
+  startSeconds,
+  endSeconds,
+) {
+  let processedItems = 0;
+
+  for (let trackIndex = 0; trackIndex < trackCount; trackIndex += 1) {
+    const initialItems = await getTrackItems(
+      project,
+      sequenceGuid,
+      mediaType,
+      trackIndex,
+    );
+
+    for (let itemIndex = 0; itemIndex < initialItems.length; itemIndex += 1) {
+      const currentItems = await getTrackItems(
+        project,
+        sequenceGuid,
+        mediaType,
+        trackIndex,
+      );
+      const itemToTrim = currentItems[itemIndex];
+      if (!itemToTrim) {
+        throw new Error(`O item de ${mediaType} não foi localizado para recorte.`);
+      }
+      executeActions(
+        project,
+        (compoundAction) => {
+          const startTime = app.TickTime.createWithSeconds(startSeconds);
+          const endTime = app.TickTime.createWithSeconds(endSeconds);
+          compoundAction.addAction(itemToTrim.createSetStartAction(startTime));
+          compoundAction.addAction(itemToTrim.createSetEndAction(endTime));
+        },
+        `Aparar ${mediaType} do primeiro corte`,
+      );
+
+      const refreshedItems = await getTrackItems(
+        project,
+        sequenceGuid,
+        mediaType,
+        trackIndex,
+      );
+      const itemToMove = refreshedItems[itemIndex];
+      if (!itemToMove) {
+        throw new Error(
+          `O item de ${mediaType} não foi relocalizado após o recorte.`,
+        );
+      }
+
+      executeActions(
+        project,
+        (compoundAction) => {
+          const offset = app.TickTime.createWithSeconds(-startSeconds);
+          compoundAction.addAction(itemToMove.createMoveAction(offset));
+        },
+        `Mover ${mediaType} do primeiro corte para zero`,
+      );
+      processedItems += 1;
+    }
+  }
+
+  return processedItems;
+}
+
+async function createFirstCutSequence(projectName, firstCut) {
+  if (!firstCut) {
+    throw new Error("O JSON não contém um primeiro corte.");
+  }
+
+  const project = await getActiveProject();
+  const sequences = await project.getSequences();
+  const masterName = createMasterSequenceName(projectName);
+  const masterSequence = findSequenceByName(sequences, masterName);
+  if (!masterSequence) {
+    throw new Error(`A sequência master "${masterName}" não foi encontrada.`);
+  }
+  const masterGuid = masterSequence.guid;
+
+  const cutName = createCutSequenceName(firstCut.name, 1);
+  if (hasSequenceNameConflict(sequences.map((sequence) => sequence.name), cutName)) {
+    throw new Error(
+      `Já existe uma sequência chamada "${cutName}". Nenhum corte foi criado.`,
+    );
+  }
+
+  const settings = await masterSequence.getSettings();
+  const frameRate = await settings.getVideoFrameRate();
+  const alignedStart = app.TickTime.createWithSeconds(
+    firstCut.startSeconds,
+  ).alignToNearestFrame(frameRate);
+  const alignedEnd = app.TickTime.createWithSeconds(
+    firstCut.endSeconds,
+  ).alignToNearestFrame(frameRate);
+
+  if (alignedEnd.seconds <= alignedStart.seconds) {
+    throw new Error("O intervalo ficou vazio após o alinhamento aos frames.");
+  }
+
+  const alignedStartSeconds = alignedStart.seconds;
+  const alignedEndSeconds = alignedEnd.seconds;
+  const masterForSubsequence = await project.getSequence(masterGuid);
+  const subsequence = await masterForSubsequence.createSubsequence(true);
+  if (!subsequence) {
+    throw new Error("O Premiere não retornou a subsequência criada.");
+  }
+  const subsequenceGuid = subsequence.guid;
+
+  const sequenceForTrackCounts = await project.getSequence(subsequenceGuid);
+  const videoTrackCount = await sequenceForTrackCounts.getVideoTrackCount();
+  const sequenceForAudioCount = await project.getSequence(subsequenceGuid);
+  const audioTrackCount = await sequenceForAudioCount.getAudioTrackCount();
+  const videoItemsProcessed = await trimTrackGroup(
+    project,
+    subsequenceGuid,
+    "video",
+    videoTrackCount,
+    alignedStartSeconds,
+    alignedEndSeconds,
+  );
+  const audioItemsProcessed = await trimTrackGroup(
+    project,
+    subsequenceGuid,
+    "audio",
+    audioTrackCount,
+    alignedStartSeconds,
+    alignedEndSeconds,
+  );
+
+  if (videoItemsProcessed === 0 || audioItemsProcessed === 0) {
+    throw new Error(
+      "A subsequência não continha itens de vídeo e áudio para recortar.",
+    );
+  }
+
+  const subsequenceForProjectItem = await project.getSequence(subsequenceGuid);
+  const sequenceItem = await subsequenceForProjectItem.getProjectItem();
+  if (!sequenceItem) {
+    throw new Error("Não foi possível acessar o item da subsequência criada.");
+  }
+
+  executeActions(
+    project,
+    (compoundAction) => {
+      compoundAction.addAction(sequenceItem.createSetNameAction(cutName));
+    },
+    "Nomear o primeiro corte",
+  );
+
+  const subsequenceForEnd = await project.getSequence(subsequenceGuid);
+  const actualEnd = await subsequenceForEnd.getEndTime();
+  const subsequenceForZero = await project.getSequence(subsequenceGuid);
+  const zeroPoint = await subsequenceForZero.getZeroPoint();
+  const alignedDurationSeconds = alignedEndSeconds - alignedStartSeconds;
+  const actualDurationSeconds = actualEnd.seconds - zeroPoint.seconds;
+
+  return {
+    sequenceName: cutName,
+    masterSequenceName: masterName,
+    sourceStartSeconds: firstCut.startSeconds,
+    sourceEndSeconds: firstCut.endSeconds,
+    alignedStartSeconds,
+    alignedEndSeconds,
+    expectedDurationSeconds: alignedDurationSeconds,
+    actualDurationSeconds,
+    deviationSeconds: Math.abs(actualDurationSeconds - alignedDurationSeconds),
+    zeroPointSeconds: zeroPoint.seconds,
+  };
+}
+
+module.exports = { createFirstCutSequence, createMasterSequence };

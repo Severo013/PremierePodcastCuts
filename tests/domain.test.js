@@ -3,6 +3,7 @@ const { readFileSync } = require("node:fs");
 const { parseTimestamp } = require("../src/domain/timestamp");
 const { parseCutsJson } = require("../src/domain/cuts-parser");
 const {
+  createCutSequenceName,
   createMasterSequenceName,
   hasSequenceNameConflict,
   sanitizeSequenceName,
@@ -49,6 +50,7 @@ assert.strictEqual(
   createMasterSequenceName("Episódio: IA"),
   "00_MASTER - Episódio IA",
 );
+assert.strictEqual(createCutSequenceName("Primeiro: corte", 1), "01 - Primeiro corte");
 assert.strictEqual(
   hasSequenceNameConflict(
     ["Sequência 01", "00_master - episódio ia"],
