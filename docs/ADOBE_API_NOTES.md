@@ -29,7 +29,7 @@ A assinatura exata deve ser confirmada no SDK instalado antes da implementação
 
 A UXP Storage API oferece `localFileSystem.getFileForOpening()`.
 
-Exemplo conceitual:
+Assinatura confirmada e usada na Fase 1:
 
 ```js
 const { localFileSystem } = require("uxp").storage;
@@ -37,9 +37,16 @@ const file = await localFileSystem.getFileForOpening({
   allowMultiple: false,
   types: ["json"]
 });
+
+if (file) {
+  const text = await file.read();
+}
 ```
 
-Confirmar o formato aceito em `types` na versão instalada.
+- `allowMultiple: false` retorna um `File` ou valor vazio no cancelamento;
+- `types` recebe extensões sem ponto;
+- `File.read()` retorna uma `Promise<string|ArrayBuffer>` e usa UTF-8 por padrão;
+- fonte: `https://developer.adobe.com/premiere-pro/uxp/uxp-api/reference-js/modules/uxp/persistent-file-storage/file`.
 
 ### Permissão
 

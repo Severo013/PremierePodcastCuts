@@ -40,25 +40,42 @@ O MVP não aplica fades, tratamento de áudio nem exportação automática.
 Depois de alterar HTML, CSS ou JavaScript, clique em `Reload` no UXP
 Developer Tool para recarregar o painel.
 
-## Testar a Fase 0
+## Testar o painel
 
 1. Abra o painel no Premiere.
-2. Confirme que o texto `Painel carregado. Clique no botão para testar.`
-   está visível.
-3. Clique em `Testar painel`.
-4. Confirme que o texto muda para
-   `Teste concluído: o painel está respondendo.`.
+2. Clique em `Selecionar JSON`.
+3. Selecione `samples/cuts.example.json`.
+4. Confirme que o painel mostra o arquivo, o projeto e os três cortes com suas
+   durações.
 
-O teste não seleciona arquivos e não acessa nem modifica o projeto aberto.
+O teste não acessa nem modifica o projeto aberto.
+
+## Executar os testes de domínio
+
+Com Node.js disponível no terminal, execute:
+
+```text
+npm test
+```
+
+Os testes usam apenas o módulo `assert` nativo e não exigem instalação de
+dependências.
+
+Neste ambiente, que possui Deno mas não Node.js, a mesma suíte pode ser executada
+com:
+
+```text
+deno run --allow-read --unstable-detect-cjs tests/domain.test.js
+```
 
 ## Depurar
 
 1. No UXP Developer Tool, localize o plugin carregado.
 2. Clique em `Debug` para abrir o Developer Tools do painel.
 3. Selecione a aba `Console` para consultar erros e mensagens.
-4. Repita o teste do botão com o console aberto.
+4. Repita a seleção e validação do JSON com o console aberto.
 
-Para a Fase 0, o resultado esperado é nenhum erro no console.
+Para um JSON válido, o resultado esperado é nenhum erro no console.
 
 ## Como usar estes documentos com o Codex
 

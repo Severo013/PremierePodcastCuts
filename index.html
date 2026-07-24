@@ -10,9 +10,33 @@
     <main class="panel">
       <h1>Premiere Podcast Cuts</h1>
       <p id="status" role="status" aria-live="polite">
-        Painel carregado. Clique no botão para testar.
+        Selecione um arquivo JSON para validar os cortes.
       </p>
-      <button id="test-button" type="button">Testar painel</button>
+      <button id="select-json-button" type="button">Selecionar JSON</button>
+
+      <section id="summary" class="summary" hidden>
+        <h2>Resumo</h2>
+        <dl>
+          <div>
+            <dt>Arquivo</dt>
+            <dd id="json-file-name"></dd>
+          </div>
+          <div>
+            <dt>Projeto</dt>
+            <dd id="project-name"></dd>
+          </div>
+          <div>
+            <dt>Cortes</dt>
+            <dd id="cuts-count"></dd>
+          </div>
+        </dl>
+        <ol id="cuts-list"></ol>
+      </section>
+
+      <section id="errors" class="errors" role="alert" hidden>
+        <h2>Erros de validação</h2>
+        <ul id="errors-list"></ul>
+      </section>
     </main>
 
     <script src="main.js"></script>

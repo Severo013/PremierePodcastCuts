@@ -17,6 +17,11 @@ h1 {
   font-size: 20px;
 }
 
+h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
 #status {
   min-height: 40px;
   margin: 0;
@@ -25,4 +30,54 @@ h1 {
 
 button {
   align-self: flex-start;
+}
+
+.summary,
+.errors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--uxp-host-border-color, #707070);
+  border-radius: 4px;
+}
+
+[hidden] {
+  display: none;
+}
+
+dl,
+ol,
+ul {
+  margin: 0;
+}
+
+dl > div {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+dt {
+  font-weight: bold;
+}
+
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+ol,
+ul {
+  padding-left: 22px;
+}
+
+li + li {
+  margin-top: 8px;
+}
+
+.errors {
+  color: var(--uxp-host-text-color-negative, #ff8a80);
+  border-color: currentColor;
 }

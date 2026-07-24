@@ -10,8 +10,7 @@
   },
   "manifestVersion": 5,
   "requiredPermissions": {
-    "localFileSystem": "request",
-    "clipboard": "readAndWrite"
+    "localFileSystem": "request"
   },
   "entrypoints": [
     {
