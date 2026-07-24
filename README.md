@@ -45,13 +45,14 @@ Developer Tool para recarregar o painel.
 1. Abra o painel no Premiere.
 2. Clique em `Selecionar JSON` e selecione `samples/cuts.example.json`.
 3. Clique em `Selecionar MP4` e escolha um vídeo de teste.
-4. Confirme que o painel mostra os dois nomes e habilita `Criar cortes`.
+4. Confirme que o painel mostra os dois nomes e habilita `Criar master`.
 5. Abra um projeto no Premiere.
-6. Clique em `Criar cortes` e confira no log se a mídia foi reutilizada ou
-   importada.
+6. Clique em `Criar master` e confira no log se a mídia foi reutilizada ou
+   importada e se a sequência master foi criada.
 
-Nesta fase, o botão pode importar o MP4 no bin raiz do projeto. Ele ainda não cria
-sequências e não salva o projeto automaticamente.
+Nesta fase, o botão pode importar o MP4 e cria uma sequência
+`00_MASTER - <projectName>` no bin raiz. Ele ainda não cria as sequências de corte
+e não salva o projeto automaticamente.
 
 ## Executar os testes de domínio
 

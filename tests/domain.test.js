@@ -3,6 +3,11 @@ const { readFileSync } = require("node:fs");
 const { parseTimestamp } = require("../src/domain/timestamp");
 const { parseCutsJson } = require("../src/domain/cuts-parser");
 const {
+  createMasterSequenceName,
+  hasSequenceNameConflict,
+  sanitizeSequenceName,
+} = require("../src/domain/sequence-name");
+const {
   PHASES,
   createInitialState,
   finishExecution,
@@ -38,6 +43,23 @@ assert.strictEqual(parseTimestamp("00:60:00"), null);
 assert.strictEqual(parseTimestamp("1:02"), null);
 assert.strictEqual(parseTimestamp("00:00:10.00"), null);
 assert.strictEqual(parseTimestamp(" 00:00:10.000"), null);
+assert.strictEqual(sanitizeSequenceName('  Episódio: IA / "2026"  '), "Episódio IA 2026");
+assert.strictEqual(sanitizeSequenceName("<>:\"/\\|?*"), "Projeto");
+assert.strictEqual(
+  createMasterSequenceName("Episódio: IA"),
+  "00_MASTER - Episódio IA",
+);
+assert.strictEqual(
+  hasSequenceNameConflict(
+    ["Sequência 01", "00_master - episódio ia"],
+    "00_MASTER - Episódio IA",
+  ),
+  true,
+);
+assert.strictEqual(
+  hasSequenceNameConflict(["Sequência 01"], "00_MASTER - Episódio IA"),
+  false,
+);
 
 const valid = parseCutsJson(createDocument([createCut()]));
 assert.deepStrictEqual(valid.errors, []);

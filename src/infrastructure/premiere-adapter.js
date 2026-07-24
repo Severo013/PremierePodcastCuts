@@ -1,4 +1,8 @@
 const app = require("premierepro");
+const {
+  createMasterSequenceName,
+  hasSequenceNameConflict,
+} = require("../domain/sequence-name");
 
 function normalizeMediaPath(mediaPath) {
   return mediaPath.replace(/\//g, "\\").toLowerCase();
@@ -47,33 +51,28 @@ async function findClipInFolder(folder, mediaPath) {
   return null;
 }
 
-function createMediaResult(project, clip, mediaPath, imported) {
-  return {
-    projectName: project.name,
-    itemName: clip.name,
-    mediaPath,
-    imported,
-  };
-}
-
-async function prepareMedia(mediaPath) {
-  if (typeof mediaPath !== "string" || !mediaPath) {
-    throw new Error("O caminho nativo do vídeo selecionado não está disponível.");
-  }
-
+async function getActiveProject() {
   const project = await app.Project.getActiveProject();
   if (!project) {
     throw new Error("Nenhum projeto ativo. Abra um projeto no Premiere e tente novamente.");
   }
 
+  return project;
+}
+
+async function getRootItem(project) {
   const rootItem = await project.getRootItem();
   if (!rootItem) {
     throw new Error("Não foi possível acessar o bin raiz do projeto ativo.");
   }
 
+  return rootItem;
+}
+
+async function ensureMedia(project, rootItem, mediaPath) {
   const existingClip = await findClipInFolder(rootItem, mediaPath);
   if (existingClip) {
-    return createMediaResult(project, existingClip, mediaPath, false);
+    return { clip: existingClip, imported: false };
   }
 
   const imported = await project.importFiles([mediaPath], true, rootItem, false);
@@ -89,7 +88,51 @@ async function prepareMedia(mediaPath) {
     );
   }
 
-  return createMediaResult(project, importedClip, mediaPath, true);
+  return { clip: importedClip, imported: true };
 }
 
-module.exports = { prepareMedia };
+async function assertMasterNameAvailable(project, masterName) {
+  const sequences = await project.getSequences();
+  const conflict = hasSequenceNameConflict(
+    sequences.map((sequence) => sequence.name),
+    masterName,
+  );
+
+  if (conflict) {
+    throw new Error(
+      `Já existe uma sequência chamada "${masterName}". Nenhuma master foi criada.`,
+    );
+  }
+}
+
+async function createMasterSequence(mediaPath, projectName) {
+  if (typeof mediaPath !== "string" || !mediaPath) {
+    throw new Error("O caminho nativo do vídeo selecionado não está disponível.");
+  }
+
+  const masterName = createMasterSequenceName(projectName);
+  const project = await getActiveProject();
+  await assertMasterNameAvailable(project, masterName);
+
+  const rootItem = await getRootItem(project);
+  const media = await ensureMedia(project, rootItem, mediaPath);
+  const sequence = await project.createSequenceFromMedia(
+    masterName,
+    [media.clip],
+    rootItem,
+  );
+
+  if (!sequence) {
+    throw new Error("O Premiere não retornou a sequência master criada.");
+  }
+
+  return {
+    projectName: project.name,
+    itemName: media.clip.name,
+    mediaPath,
+    imported: media.imported,
+    masterSequenceName: sequence.name,
+  };
+}
+
+module.exports = { createMasterSequence };

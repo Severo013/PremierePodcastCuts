@@ -113,14 +113,16 @@ método diretamente e aguarda sua `Promise`, sem chamar `Project.save()`.
 
 ### Criação de sequência pela mídia
 
-Candidato: `Project.createSequenceFromMedia`.
-
-Confirmar:
-
-- tipos dos argumentos;
-- item/bin de destino;
-- tipo de retorno;
-- propriedades copiadas da mídia.
+- método: `Project.createSequenceFromMedia`;
+- assinatura da declaração oficial: `createSequenceFromMedia(name: string, clipProjectItems?: ClipProjectItem[], targetBin?: ProjectItem): Promise<Sequence>`;
+- uso na Fase 4: `await project.createSequenceFromMedia(name, [clip], rootItem)`;
+- destino: o `FolderItem` retornado por `Project.getRootItem()` é aceito como `ProjectItem` de destino;
+- retorno: `Promise<Sequence>`;
+- conflito: `Project.getSequences(): Promise<Sequence[]>`, com leitura de `Sequence.name`;
+- versão mínima: 25.6;
+- fontes: `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project` e `https://github.com/adobe/premierepro-types/blob/main/src/premierepro.d.ts`;
+- a API é assíncrona direta e não possui Action equivalente documentada;
+- comportamento de cópia de resolução, frame rate, duração, vídeo e áudio: pendente de T09 no Premiere.
 
 ### Pontos In/Out
 

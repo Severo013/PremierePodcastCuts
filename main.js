@@ -3,7 +3,9 @@ const {
   selectVideoFile,
 } = require("./src/infrastructure/file-picker");
 const { parseCutsJson } = require("./src/domain/cuts-parser");
-const { prepareMedia } = require("./src/infrastructure/premiere-adapter");
+const {
+  createMasterSequence,
+} = require("./src/infrastructure/premiere-adapter");
 const {
   PHASES,
   createInitialState,
@@ -52,7 +54,7 @@ function formatDuration(seconds) {
 
 function getStatusText(currentState) {
   if (currentState.phase === PHASES.RUNNING) {
-    return "Localizando ou importando o vídeo...";
+    return "Criando a sequência master...";
   }
 
   if (currentState.phase === PHASES.ERROR) {
@@ -60,7 +62,7 @@ function getStatusText(currentState) {
   }
 
   if (currentState.phase === PHASES.READY) {
-    return "JSON e vídeo selecionados. Pronto para criar cortes.";
+    return "JSON e vídeo selecionados. Pronto para criar a master.";
   }
 
   if (currentState.phase === PHASES.PARTIAL) {
@@ -169,21 +171,25 @@ async function handleCreateCuts() {
       return;
     }
 
-    const result = await prepareMedia(state.videoInput.nativePath);
+    const result = await createMasterSequence(
+      state.videoInput.nativePath,
+      state.jsonInput.projectName,
+    );
     state = finishExecution(state, [
       `Projeto ativo: ${result.projectName}.`,
       result.imported
         ? `Mídia importada: ${result.itemName}.`
         : `Mídia já existente reutilizada: ${result.itemName}.`,
       `Caminho confirmado: ${result.mediaPath}.`,
-      "Nenhuma sequência foi criada e o projeto não foi salvo automaticamente.",
+      `Sequência master criada: ${result.masterSequenceName}.`,
+      "O projeto não foi salvo automaticamente.",
     ]);
   } catch (error) {
-    console.error("Falha ao localizar ou importar a mídia.", error);
+    console.error("Falha ao criar a sequência master.", error);
     state = withError(
       state,
-      [error.message || "Falha inesperada ao preparar a mídia."],
-      { logs: [...state.logs, "A preparação da mídia falhou."] },
+      [error.message || "Falha inesperada ao criar a sequência master."],
+      { logs: [...state.logs, "A criação da master falhou."] },
     );
   } finally {
     render();

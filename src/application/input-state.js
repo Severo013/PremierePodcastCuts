@@ -60,7 +60,7 @@ function withError(state, errors, options = {}) {
 function startExecution(state) {
   if (!state.jsonInput || !state.videoInput) {
     return withError(state, [
-      "Selecione um JSON válido e um vídeo MP4 antes de criar os cortes.",
+      "Selecione um JSON válido e um vídeo MP4 antes de criar a master.",
     ]);
   }
 
@@ -69,7 +69,7 @@ function startExecution(state) {
     phase: PHASES.RUNNING,
     errors: [],
     logs: [
-      "Iniciando preparação da mídia.",
+      "Iniciando criação da sequência master.",
       `JSON: ${state.jsonInput.name} (${state.jsonInput.cuts.length} cortes).`,
       `Vídeo: ${state.videoInput.name}.`,
       "Estado de entrada validado.",
@@ -81,7 +81,7 @@ function finishExecution(state, operationLogs) {
   return {
     ...state,
     phase: derivePhase(state.jsonInput, state.videoInput),
-    logs: [...state.logs, ...operationLogs, "Preparação da mídia concluída."],
+    logs: [...state.logs, ...operationLogs, "Criação da master concluída."],
   };
 }
 
