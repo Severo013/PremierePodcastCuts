@@ -4,9 +4,9 @@
 
 Registrar somente APIs confirmadas durante o desenvolvimento. Este documento deve ser atualizado pelo agente sempre que uma integração for implementada.
 
-## Ambiente mínimo planejado
+## Ambiente mínimo utilizado
 
-- Premiere 25.6 ou superior;
+- Premiere 26.3 ou superior, conforme o manifest;
 - UXP Developer Tool 2.2 ou superior;
 - template `premierepro-quick-starter`;
 - Manifest v5 ou versão gerada pelo template.
@@ -77,9 +77,7 @@ Para selecionar arquivos do usuário, declarar no `manifest.json`:
 
 A posição exata e demais propriedades dependem do manifest criado pelo template.
 
-## APIs a confirmar antes do uso
-
-Preencher durante as fases 3 a 6.
+## APIs utilizadas pelo MVP
 
 ### Importação de mídia
 
@@ -91,7 +89,7 @@ Preencher durante as fases 3 a 6.
 - filhos do bin: `FolderItem.getItems(): Promise<ProjectItem[]>`;
 - versão mínima: 25.6;
 - fonte oficial: `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project` e `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/folderitem`;
-- comportamento testado: pendente de teste manual no Premiere.
+- comportamento testado: importação e reutilização por caminho validadas no Premiere.
 
 `Project.importFiles` é documentado como operação assíncrona direta. A
 referência não apresenta uma Action equivalente para importação; a Fase 3 usa o
@@ -109,7 +107,7 @@ método diretamente e aguarda sua `Promise`, sem chamar `Project.save()`.
 - versão mínima: 25.6;
 - fonte oficial prioritária: `https://github.com/adobe/premierepro-types/blob/main/src/premierepro.d.ts`;
 - observação: o adapter confirma igualdade normalizada do caminho retornado antes de reutilizar;
-- comportamento testado: pendente de teste manual no Premiere.
+- comportamento testado: busca recursiva e comparação de caminho validadas no Premiere.
 
 ### Criação de sequência pela mídia
 
@@ -122,33 +120,34 @@ método diretamente e aguarda sua `Promise`, sem chamar `Project.save()`.
 - versão mínima: 25.6;
 - fontes: `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project` e `https://github.com/adobe/premierepro-types/blob/main/src/premierepro.d.ts`;
 - a API é assíncrona direta e não possui Action equivalente documentada;
-- comportamento de cópia de resolução, frame rate, duração, vídeo e áudio: pendente de T09 no Premiere.
+- resolução, frame rate, duração, vídeo e áudio foram validados na Fase 4.
 
-### Pontos In/Out
+### Tempo e alinhamento de frames
 
 - tempo: `TickTime.createWithSeconds(seconds: number): TickTime`;
 - alinhamento: `TickTime.alignToNearestFrame(frameRate: FrameRate): TickTime`;
 - frame rate: `Sequence.getSettings(): Promise<SequenceSettings>` e `SequenceSettings.getVideoFrameRate(): FrameRate` (26.2+);
 - compatibilidade: o manifest exige Premiere 26.3, portanto essa assinatura está dentro da versão mínima carregável do plugin;
-- In: `Sequence.createSetInPointAction(tickTime: TickTime): Action`;
-- Out: `Sequence.createSetOutPointAction(tickTime: TickTime): Action`;
 - transação: `Project.executeTransaction(callback: (compoundAction: CompoundAction) => void, undoString?: string): boolean`;
 - nas versões atuais, toda Action deve ser criada dentro de
   `Project.lockedAccess(callback: () => void): void`; a Action é criada e usada
   por `executeTransaction` no mesmo callback síncrono;
 - precisão: início e fim são alinhados individualmente ao frame mais próximo;
-- inclusão/exclusão do frame no Out: pendente de prova manual com intervalo de dez segundos.
+- `Sequence.createSetInPointAction` e `createSetOutPointAction` foram avaliados,
+  mas não são usados no MVP final porque `createSubsequence` ignorou esses
+  limites no runtime validado.
 
 ### Criação de subsequência
 
 - assinatura: `Sequence.createSubsequence(ignoreTrackTargeting?: boolean): Promise<Sequence>`;
-- uso: `await masterSequence.createSubsequence(true)` para ignorar track targeting;
+- uso: `await masterSequence.createSubsequence(true)` para criar a cópia
+  editável integral antes do recorte dos track items;
 - rename: `Sequence.getProjectItem(): Promise<ProjectItem>` e `ProjectItem.createSetNameAction(name: string): Action`;
 - zero: `Sequence.createSetZeroPointAction(tickTime: TickTime): Action` está
   documentado, mas foi considerado indisponível para esta prova após falhar no
   runtime 26.3 com uma referência relocalizada;
 - medição: `Sequence.getEndTime(): Promise<TickTime>` e `Sequence.getZeroPoint(): Promise<TickTime>`;
-- inclusão sincronizada de vídeo/áudio e início efetivo do conteúdo em zero: pendentes de prova manual.
+- vídeo, áudio, sincronismo e duração foram validados manualmente na Fase 5.
 
 ### Recorte dos track items da subsequência
 
@@ -174,6 +173,18 @@ método diretamente e aguarda sua `Promise`, sem chamar `Project.save()`.
 - o rename é criado dentro de `Project.lockedAccess`; a alteração do zero
   point foi retirada após a limitação confirmada no runtime.
 
+### Validação segura da master existente
+
+- a sequência é localizada por nome com `Project.getSequences()`;
+- `Sequence.getVideoTrackCount()` e `Sequence.getVideoTrack(index)` percorrem
+  suas tracks de vídeo;
+- `VideoTrack.getTrackItems(Constants.TrackItemType.CLIP, false)` retorna os
+  clips da timeline;
+- `VideoClipTrackItem.getProjectItem()` obtém o item fonte e
+  `ClipProjectItem.getMediaFilePath()` confirma o caminho nativo;
+- a master somente é reutilizada quando ao menos um item corresponde exatamente
+  ao MP4 selecionado após normalização de barras e caixa.
+
 ## Registro de decisão
 
 ### Estratégia escolhida
@@ -192,10 +203,16 @@ revisada: a subsequência ainda preserva as configurações da master, mas seus
 
 ### Limitações conhecidas
 
-- a inclusão do frame no ponto Out precisa ser medida no Premiere;
-- o recorte e deslocamento sincronizado dos track items de áudio e vídeo foi
-  validado manualmente na Fase 5;
-- se a subsequência for criada e a transação de rename falhar, a API não oferece atomicidade entre as duas operações assíncronas.
+- a API não oferece atomicidade entre criação assíncrona da subsequência e
+  as transações posteriores; em fail-fast, cortes concluídos permanecem;
+- se a importação for concluída e a criação da master falhar, a mídia
+  importada não é removida automaticamente;
+- `createSetZeroPointAction` não foi utilizável no runtime 26.3; o deslocamento
+  dos track items para zero é usado no lugar;
+- caminhos são comparados com normalização apropriada ao ambiente Windows
+  validado; aliases ou links simbólicos diferentes para o mesmo arquivo podem
+  não ser reconhecidos como equivalentes;
+- o projeto permanece não salvo ao final por decisão de segurança do MVP.
 
 ### Correção confirmada em teste da Fase 5
 
@@ -208,8 +225,8 @@ Action de zero point. O adapter passou a:
   permanece dentro de `lockedAccess`, seguindo o sample oficial `premiere-api`;
 - relocalizar `Sequence` por GUID depois de operações assíncronas;
 - criar os objetos `TickTime` dentro da transação;
-- reler e validar In/Out antes de chamar `createSubsequence`, abortando antes da
-  criação caso o Premiere não tenha aplicado o intervalo.
+- abandonar In/Out como mecanismo de recorte e operar nos track items da
+  subsequência, após o comportamento integral ter sido confirmado.
 
 O teste seguinte confirmou que, no runtime 26.3 instalado,
 `Project.getSequence(guid)` retorna uma Promise. Embora a página de referência

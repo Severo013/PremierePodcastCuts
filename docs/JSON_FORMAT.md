@@ -155,7 +155,15 @@ Problemas:
 - `name` vazio;
 - fim anterior ao início.
 
-## 7. Evolução futura
+## 7. Limites operacionais do MVP
+
+- arquivo com até 5 milhões de caracteres;
+- no máximo 1000 cortes;
+- nomes higienizados para até 100 caracteres antes do prefixo numérico;
+- o painel mostra os primeiros 200 cortes, mas processa todos os validados;
+- timestamps que resultem em valores não finitos são rejeitados.
+
+## 8. Evolução futura
 
 Novos campos poderão ser adicionados sem quebrar a versão 1, desde que opcionais:
 

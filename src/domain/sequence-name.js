@@ -1,4 +1,5 @@
 const INVALID_NAME_CHARACTERS = /[\u0000-\u001f<>:"/\\|?*]/g;
+const MAX_SANITIZED_NAME_LENGTH = 100;
 
 function sanitizeSequenceName(value) {
   const sanitized = String(value)
@@ -7,7 +8,15 @@ function sanitizeSequenceName(value) {
     .replace(/[. ]+$/g, "")
     .trim();
 
-  return sanitized || "Projeto";
+  if (!sanitized) {
+    return "Projeto";
+  }
+
+  return Array.from(sanitized)
+    .slice(0, MAX_SANITIZED_NAME_LENGTH)
+    .join("")
+    .replace(/[. ]+$/g, "")
+    .trim() || "Projeto";
 }
 
 function createMasterSequenceName(projectName) {
@@ -32,18 +41,10 @@ function findSequenceNameConflicts(sequenceNames, expectedNames) {
   );
 }
 
-function hasSequenceNameConflict(sequenceNames, expectedName) {
-  const normalizedExpectedName = expectedName.toLowerCase();
-  return sequenceNames.some(
-    (sequenceName) => sequenceName.toLowerCase() === normalizedExpectedName,
-  );
-}
-
 module.exports = {
   createCutSequenceName,
   createCutSequenceNames,
   createMasterSequenceName,
   findSequenceNameConflicts,
-  hasSequenceNameConflict,
   sanitizeSequenceName,
 };

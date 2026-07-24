@@ -30,31 +30,61 @@ O MVP não aplica fades, tratamento de áudio nem exportação automática.
 
 ## Carregar o plugin no Premiere
 
-1. Abra o Adobe Premiere e mantenha-o em execução.
-2. Abra o UXP Developer Tool.
-3. Clique em `Add Plugin`.
-4. Selecione o arquivo `manifest.json` na raiz deste repositório.
-5. Na linha do plugin `PremierePodcastCuts`, clique em `Load`.
-6. No Premiere, abra `Window > UXP Plugins > PremierePro Starter Panel Project`.
+1. No Premiere, abra as configurações de plugins e habilite `Developer Mode`.
+2. Reinicie o Premiere e mantenha-o aberto.
+3. Abra o UXP Developer Tool 2.2 ou superior.
+4. Clique em `Add Plugin`.
+5. Selecione o arquivo `manifest.json` na raiz deste repositório.
+6. Na linha do plugin `PremierePodcastCuts`, clique em `Load`.
+7. No Premiere, abra `Window > UXP Plugins > Premiere Podcast Cuts`.
 
 Depois de alterar HTML, CSS ou JavaScript, clique em `Reload` no UXP
 Developer Tool para recarregar o painel.
+Alterações no `manifest.json` exigem `Unload` seguido de `Load`.
 
-## Testar o painel
+## Uso completo
 
-1. Abra o painel no Premiere.
-2. Clique em `Selecionar JSON` e selecione `samples/cuts.example.json`.
-3. Clique em `Selecionar MP4` e escolha um vídeo de teste.
-4. Confirme que o painel mostra os dois nomes e habilita `Criar cortes`.
-5. Abra o projeto que já contém a master validada na Fase 4.
+1. Abra ou crie um projeto no Premiere.
+2. Abra o painel `Premiere Podcast Cuts`.
+3. Clique em `Selecionar JSON`; para a prova, use
+   `samples/cuts.example.json`.
+4. Clique em `Selecionar MP4` e escolha o vídeo ao qual os timestamps se
+   referem.
+5. Confira arquivo, projeto, quantidade e resumo dos cortes.
 6. Clique em `Criar cortes` e acompanhe o progresso `atual/total`.
-7. Confira no relatório os cortes solicitados, criados e as falhas.
+7. Confira no relatório a master, a mídia reutilizada/importada, os nomes
+   criados, as durações e eventuais falhas.
 
-O botão usa a sequência `00_MASTER - <projectName>` existente e processa todos
-os itens de `cuts` na ordem do JSON, gerando `01 - ...`, `02 - ...`, `03 - ...`.
-Todos os conflitos são verificados antes da primeira criação. Um erro durante o
-processamento interrompe os cortes seguintes, e o projeto não é salvo
-automaticamente.
+Se `00_MASTER - <projectName>` não existir, o plugin localiza ou importa o MP4 e
+cria a master. Se existir, ela somente é reutilizada quando um item de vídeo da
+sequência referencia exatamente o caminho nativo do MP4 selecionado. Uma master
+com o mesmo nome e outra mídia causa aborto sem alteração.
+
+Os cortes são processados na ordem do JSON como `01 - ...`, `02 - ...`,
+`03 - ...`. Todos os conflitos são verificados antes de importar mídia ou criar
+sequências. Um erro durante os cortes interrompe os seguintes; os já concluídos
+permanecem e aparecem no relatório.
+
+## Contrato e limites
+
+- JSON conforme `docs/JSON_FORMAT.md`, com `schemaVersion: 1`;
+- um único `.json` e um único `.mp4` por execução;
+- timestamps `HH:MM:SS.mmm`, `H:MM:SS`, `MM:SS` ou `MM:SS.mmm`;
+- horas podem ultrapassar `01`, desde que o intervalo exista na mídia;
+- até 5 milhões de caracteres e 1000 cortes por JSON;
+- o painel exibe os primeiros 200 cortes e processa todos os cortes validados;
+- nomes são higienizados e limitados a 100 caracteres antes do prefixo;
+- cancelar qualquer seletor preserva a seleção anterior.
+
+## Segurança e comportamento de erro
+
+- sequências existentes nunca são sobrescritas;
+- a reutilização de mídia compara o caminho nativo completo;
+- o MP4 original não é alterado;
+- nenhum item é excluído ou renomeado fora das novas sequências;
+- o projeto não é salvo automaticamente;
+- não são aplicados efeitos, fades, presets ou exportação;
+- falhas mostram contexto no painel e detalhes no Console do UXP Developer Tool.
 
 ## Executar os testes de domínio
 

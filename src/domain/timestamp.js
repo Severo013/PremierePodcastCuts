@@ -5,6 +5,10 @@ function millisecondsToSeconds(value) {
   return value ? Number(value) / 1000 : 0;
 }
 
+function finiteSeconds(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
 function parseTimestamp(value) {
   if (typeof value !== "string") {
     return null;
@@ -13,7 +17,7 @@ function parseTimestamp(value) {
   const hoursMatch = HOURS_TIMESTAMP_PATTERN.exec(value);
   if (hoursMatch) {
     const [, hours, minutes, seconds, milliseconds] = hoursMatch;
-    return (
+    return finiteSeconds(
       Number(hours) * 3600 +
       Number(minutes) * 60 +
       Number(seconds) +
@@ -24,7 +28,7 @@ function parseTimestamp(value) {
   const minutesMatch = MINUTES_TIMESTAMP_PATTERN.exec(value);
   if (minutesMatch) {
     const [, minutes, seconds, milliseconds] = minutesMatch;
-    return (
+    return finiteSeconds(
       Number(minutes) * 60 +
       Number(seconds) +
       millisecondsToSeconds(milliseconds)

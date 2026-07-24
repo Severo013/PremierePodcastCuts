@@ -3,11 +3,12 @@ const {
   createCutSequenceNames,
   createMasterSequenceName,
   findSequenceNameConflicts,
-  hasSequenceNameConflict,
 } = require("../domain/sequence-name");
 
 function normalizeMediaPath(mediaPath) {
-  return mediaPath.replace(/\//g, "\\").toLowerCase();
+  return typeof mediaPath === "string"
+    ? mediaPath.replace(/\//g, "\\").toLowerCase()
+    : "";
 }
 
 function isClipLikeProjectItem(item) {
@@ -39,7 +40,7 @@ async function findClipInFolder(folder, mediaPath) {
     try {
       const clip = app.ClipProjectItem.cast(item);
       const candidatePath = await clip.getMediaFilePath();
-      if (normalizeMediaPath(candidatePath) === expectedPath) {
+      if (candidatePath && normalizeMediaPath(candidatePath) === expectedPath) {
         return clip;
       }
     } catch (error) {
@@ -93,29 +94,7 @@ async function ensureMedia(project, rootItem, mediaPath) {
   return { clip: importedClip, imported: true };
 }
 
-async function assertMasterNameAvailable(project, masterName) {
-  const sequences = await project.getSequences();
-  const conflict = hasSequenceNameConflict(
-    sequences.map((sequence) => sequence.name),
-    masterName,
-  );
-
-  if (conflict) {
-    throw new Error(
-      `Já existe uma sequência chamada "${masterName}". Nenhuma master foi criada.`,
-    );
-  }
-}
-
-async function createMasterSequence(mediaPath, projectName) {
-  if (typeof mediaPath !== "string" || !mediaPath) {
-    throw new Error("O caminho nativo do vídeo selecionado não está disponível.");
-  }
-
-  const masterName = createMasterSequenceName(projectName);
-  const project = await getActiveProject();
-  await assertMasterNameAvailable(project, masterName);
-
+async function createMasterFromMedia(project, mediaPath, masterName) {
   const rootItem = await getRootItem(project);
   const media = await ensureMedia(project, rootItem, mediaPath);
   const sequence = await project.createSequenceFromMedia(
@@ -129,11 +108,8 @@ async function createMasterSequence(mediaPath, projectName) {
   }
 
   return {
-    projectName: project.name,
-    itemName: media.clip.name,
-    mediaPath,
     imported: media.imported,
-    masterSequenceName: sequence.name,
+    sequenceGuid: sequence.guid,
   };
 }
 
@@ -164,6 +140,45 @@ async function getTrackItems(project, sequenceGuid, mediaType, trackIndex) {
     ? await sequence.getVideoTrack(trackIndex)
     : await sequence.getAudioTrack(trackIndex);
   return await track.getTrackItems(app.Constants.TrackItemType.CLIP, false);
+}
+
+async function masterContainsMediaPath(project, sequenceGuid, mediaPath) {
+  const expectedPath = normalizeMediaPath(mediaPath);
+  const sequenceForCount = await project.getSequence(sequenceGuid);
+  const videoTrackCount = await sequenceForCount.getVideoTrackCount();
+
+  for (let trackIndex = 0; trackIndex < videoTrackCount; trackIndex += 1) {
+    const initialItems = await getTrackItems(
+      project,
+      sequenceGuid,
+      "video",
+      trackIndex,
+    );
+    for (let itemIndex = 0; itemIndex < initialItems.length; itemIndex += 1) {
+      try {
+        const currentItems = await getTrackItems(
+          project,
+          sequenceGuid,
+          "video",
+          trackIndex,
+        );
+        const currentItem = currentItems[itemIndex];
+        if (!currentItem) {
+          continue;
+        }
+        const projectItem = await currentItem.getProjectItem();
+        const clip = app.ClipProjectItem.cast(projectItem);
+        const candidatePath = await clip.getMediaFilePath();
+        if (normalizeMediaPath(candidatePath) === expectedPath) {
+          return true;
+        }
+      } catch (error) {
+        console.warn("Não foi possível confirmar a mídia de um item da master.", error);
+      }
+    }
+  }
+
+  return false;
 }
 
 async function trimTrackGroup(
@@ -334,31 +349,50 @@ function createExecutionError(message, report) {
   return error;
 }
 
-async function createCutSequences(projectName, cuts, onProgress = () => {}) {
+async function createCutSequences(
+  mediaPath,
+  projectName,
+  cuts,
+  onProgress = () => {},
+) {
   const requested = cuts.length;
   const report = {
     requested,
     created: [],
     failed: [],
     masterSequenceName: createMasterSequenceName(projectName),
+    masterCreated: false,
+    mediaImported: false,
+    mediaReused: false,
   };
 
   if (requested === 0) {
     throw createExecutionError("O JSON não contém cortes.", report);
   }
+  if (typeof mediaPath !== "string" || !mediaPath) {
+    throw createExecutionError(
+      "O caminho nativo do vídeo selecionado não está disponível.",
+      report,
+    );
+  }
 
-  const project = await getActiveProject();
-  const sequences = await project.getSequences();
+  let project;
+  let sequences;
+  try {
+    project = await getActiveProject();
+    sequences = await project.getSequences();
+  } catch (error) {
+    report.failed.push({
+      sequenceName: "Preparação do projeto",
+      message: error.message || "Não foi possível acessar o projeto.",
+    });
+    throw createExecutionError(report.failed[0].message, report);
+  }
   const masterSequence = findSequenceByName(
     sequences,
     report.masterSequenceName,
   );
-  if (!masterSequence) {
-    throw createExecutionError(
-      `A sequência master "${report.masterSequenceName}" não foi encontrada.`,
-      report,
-    );
-  }
+  let masterGuid = masterSequence ? masterSequence.guid : null;
 
   const cutNames = createCutSequenceNames(cuts);
   const conflicts = findSequenceNameConflicts(
@@ -376,7 +410,44 @@ async function createCutSequences(projectName, cuts, onProgress = () => {}) {
     );
   }
 
-  const masterGuid = masterSequence.guid;
+  if (masterSequence) {
+    const matchesSelectedMedia = await masterContainsMediaPath(
+      project,
+      masterGuid,
+      mediaPath,
+    );
+    if (!matchesSelectedMedia) {
+      report.failed.push({
+        sequenceName: report.masterSequenceName,
+        message: "A master existente não referencia o MP4 selecionado.",
+      });
+      throw createExecutionError(
+        `A sequência "${report.masterSequenceName}" existe, mas não referencia o MP4 selecionado. Nada foi alterado.`,
+        report,
+      );
+    }
+    report.mediaReused = true;
+  } else {
+    let masterResult;
+    try {
+      masterResult = await createMasterFromMedia(
+        project,
+        mediaPath,
+        report.masterSequenceName,
+      );
+    } catch (error) {
+      report.failed.push({
+        sequenceName: report.masterSequenceName,
+        message: error.message || "Falha ao preparar a master.",
+      });
+      throw createExecutionError(report.failed[0].message, report);
+    }
+    masterGuid = masterResult.sequenceGuid;
+    report.masterCreated = true;
+    report.mediaImported = masterResult.imported;
+    report.mediaReused = !masterResult.imported;
+  }
+
   onProgress({ current: 0, total: requested, sequenceName: null });
 
   for (let index = 0; index < cuts.length; index += 1) {
@@ -401,6 +472,8 @@ async function createCutSequences(projectName, cuts, onProgress = () => {}) {
       report.failed.push({
         cutNumber: index + 1,
         sequenceName,
+        startText: cut.startText,
+        endText: cut.endText,
         message: error.message || "Falha inesperada.",
       });
       throw createExecutionError(
@@ -413,4 +486,4 @@ async function createCutSequences(projectName, cuts, onProgress = () => {}) {
   return report;
 }
 
-module.exports = { createCutSequences, createMasterSequence };
+module.exports = { createCutSequences };

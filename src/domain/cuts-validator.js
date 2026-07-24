@@ -1,6 +1,7 @@
 const { parseTimestamp } = require("./timestamp");
 
 const SUPPORTED_SCHEMA_VERSION = 1;
+const MAX_CUTS = 1000;
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -25,6 +26,8 @@ function validateRoot(value) {
     errors.push("cuts deve ser uma lista.");
   } else if (value.cuts.length === 0) {
     errors.push("cuts deve conter pelo menos um corte.");
+  } else if (value.cuts.length > MAX_CUTS) {
+    errors.push(`cuts deve conter no máximo ${MAX_CUTS} cortes.`);
   }
 
   return errors;

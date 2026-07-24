@@ -36,6 +36,20 @@ const elements = {
 };
 
 let state = createInitialState();
+const MAX_VISIBLE_CUTS = 200;
+const MAX_VISIBLE_ERRORS = 100;
+const MAX_VISIBLE_LOGS = 500;
+
+function limitVisibleValues(values, limit, noun) {
+  if (values.length <= limit) {
+    return values;
+  }
+
+  return [
+    ...values.slice(0, limit),
+    `... ${values.length - limit} ${noun} adicionais não exibidos.`,
+  ];
+}
 
 function replaceListItems(list, values) {
   while (list.firstChild) {
@@ -88,14 +102,18 @@ function renderSummary(jsonInput) {
   elements.fileName.textContent = jsonInput.name;
   elements.projectName.textContent = jsonInput.projectName;
   elements.cutsCount.textContent = String(jsonInput.cuts.length);
-  replaceListItems(
-    elements.cutsList,
-    jsonInput.cuts.map(
+  const visibleCuts = jsonInput.cuts.slice(0, MAX_VISIBLE_CUTS);
+  const cutSummaries = visibleCuts.map(
       (cut) =>
         `${cut.id} — ${cut.name}: ${cut.startText} até ${cut.endText} ` +
         `(${formatDuration(cut.durationSeconds)})`,
-    ),
   );
+  if (jsonInput.cuts.length > visibleCuts.length) {
+    cutSummaries.push(
+      `... e mais ${jsonInput.cuts.length - visibleCuts.length} cortes não exibidos. Todos serão processados.`,
+    );
+  }
+  replaceListItems(elements.cutsList, cutSummaries);
 }
 
 function render() {
@@ -112,8 +130,14 @@ function render() {
     : "Nenhum";
 
   renderSummary(state.jsonInput);
-  replaceListItems(elements.errorsList, state.errors);
-  replaceListItems(elements.logList, state.logs);
+  replaceListItems(
+    elements.errorsList,
+    limitVisibleValues(state.errors, MAX_VISIBLE_ERRORS, "erros"),
+  );
+  replaceListItems(
+    elements.logList,
+    limitVisibleValues(state.logs, MAX_VISIBLE_LOGS, "registros"),
+  );
   elements.errors.hidden = state.errors.length === 0;
 }
 
@@ -174,6 +198,7 @@ async function handleCreateCuts() {
     }
 
     const report = await createCutSequences(
+      state.videoInput.nativePath,
       state.jsonInput.projectName,
       state.jsonInput.cuts,
       ({ current, total, sequenceName }) => {
@@ -191,6 +216,12 @@ async function handleCreateCuts() {
     state = finishExecution(state, [
       `Relatório: ${report.requested} solicitados; ${report.created.length} criados; ${report.failed.length} falhas.`,
       `Master de origem: ${report.masterSequenceName}.`,
+      report.masterCreated
+        ? "Sequência master criada nesta execução."
+        : "Sequência master existente reutilizada com mídia confirmada.",
+      report.mediaImported
+        ? "MP4 importado no projeto."
+        : "Mídia existente reutilizada sem nova importação.",
       ...report.created.map(
         (result) =>
           `${result.sequenceName}: ${formatDuration(result.actualDurationSeconds)} ` +
@@ -209,7 +240,9 @@ async function handleCreateCuts() {
       `Relatório: ${report.requested} solicitados; ${report.created.length} criados; ${report.failed.length} falhas.`,
       ...report.failed.map(
         (failure) =>
-          `Falha em ${failure.sequenceName || "corte sem nome"}: ${failure.message}`,
+          `Falha em ${failure.sequenceName || "corte sem nome"}` +
+          `${failure.startText && failure.endText ? ` (${failure.startText} até ${failure.endText})` : ""}: ` +
+          failure.message,
       ),
       "Execução interrompida pelo comportamento fail-fast.",
       "O projeto não foi salvo automaticamente.",
