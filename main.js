@@ -4,13 +4,14 @@ const {
 } = require("./src/infrastructure/file-picker");
 const { parseCutsJson } = require("./src/domain/cuts-parser");
 const {
-  createFirstCutSequence,
+  createCutSequences,
 } = require("./src/infrastructure/premiere-adapter");
 const {
   PHASES,
   createInitialState,
   finishExecution,
   startExecution,
+  updateExecutionProgress,
   withError,
   withJsonInput,
   withVideoInput,
@@ -54,7 +55,8 @@ function formatDuration(seconds) {
 
 function getStatusText(currentState) {
   if (currentState.phase === PHASES.RUNNING) {
-    return "Criando somente o primeiro corte...";
+    const progress = currentState.progress || { current: 0, total: 0 };
+    return `Criando cortes: ${progress.current}/${progress.total}.`;
   }
 
   if (currentState.phase === PHASES.ERROR) {
@@ -62,7 +64,7 @@ function getStatusText(currentState) {
   }
 
   if (currentState.phase === PHASES.READY) {
-    return "JSON e vídeo selecionados. Pronto para criar o primeiro corte.";
+    return "JSON e vídeo selecionados. Pronto para criar os cortes.";
   }
 
   if (currentState.phase === PHASES.PARTIAL) {
@@ -171,27 +173,51 @@ async function handleCreateCuts() {
       return;
     }
 
-    const result = await createFirstCutSequence(
+    const report = await createCutSequences(
       state.jsonInput.projectName,
-      state.jsonInput.cuts[0],
+      state.jsonInput.cuts,
+      ({ current, total, sequenceName }) => {
+        state = updateExecutionProgress(
+          state,
+          current,
+          total,
+          sequenceName
+            ? `Progresso ${current}/${total}: ${sequenceName} criada.`
+            : null,
+        );
+        render();
+      },
     );
     state = finishExecution(state, [
-      "Relatório: 1 corte solicitado; 1 corte criado.",
-      `Master de origem: ${result.masterSequenceName}.`,
-      `Sequência criada: ${result.sequenceName}.`,
-      `Intervalo normalizado: ${formatDuration(result.alignedStartSeconds)} até ${formatDuration(result.alignedEndSeconds)}.`,
-      `Duração esperada: ${formatDuration(result.expectedDurationSeconds)}.`,
-      `Duração medida: ${formatDuration(result.actualDurationSeconds)}.`,
-      `Desvio medido: ${formatDuration(result.deviationSeconds)}.`,
-      `Zero point: ${formatDuration(result.zeroPointSeconds)}.`,
+      `Relatório: ${report.requested} solicitados; ${report.created.length} criados; ${report.failed.length} falhas.`,
+      `Master de origem: ${report.masterSequenceName}.`,
+      ...report.created.map(
+        (result) =>
+          `${result.sequenceName}: ${formatDuration(result.actualDurationSeconds)} ` +
+          `(desvio ${formatDuration(result.deviationSeconds)}).`,
+      ),
       "O projeto não foi salvo automaticamente.",
     ]);
   } catch (error) {
-    console.error("Falha ao criar o primeiro corte.", error);
+    console.error("Falha ao criar os cortes.", error);
+    const report = error.report || {
+      requested: state.jsonInput ? state.jsonInput.cuts.length : 0,
+      created: [],
+      failed: [],
+    };
+    const reportLogs = [
+      `Relatório: ${report.requested} solicitados; ${report.created.length} criados; ${report.failed.length} falhas.`,
+      ...report.failed.map(
+        (failure) =>
+          `Falha em ${failure.sequenceName || "corte sem nome"}: ${failure.message}`,
+      ),
+      "Execução interrompida pelo comportamento fail-fast.",
+      "O projeto não foi salvo automaticamente.",
+    ];
     state = withError(
       state,
-      [error.message || "Falha inesperada ao criar o primeiro corte."],
-      { logs: [...state.logs, "A criação do primeiro corte falhou."] },
+      [error.message || "Falha inesperada ao criar os cortes."],
+      { logs: [...state.logs, ...reportLogs] },
     );
   } finally {
     render();

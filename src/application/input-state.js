@@ -25,6 +25,7 @@ function createInitialState() {
     videoInput: null,
     errors: [],
     logs: [],
+    progress: null,
   };
 }
 
@@ -34,6 +35,7 @@ function withJsonInput(state, jsonInput) {
     phase: derivePhase(jsonInput, state.videoInput),
     jsonInput,
     errors: [],
+    progress: null,
   };
 }
 
@@ -43,6 +45,7 @@ function withVideoInput(state, videoInput) {
     phase: derivePhase(state.jsonInput, videoInput),
     videoInput,
     errors: [],
+    progress: null,
   };
 }
 
@@ -60,7 +63,7 @@ function withError(state, errors, options = {}) {
 function startExecution(state) {
   if (!state.jsonInput || !state.videoInput) {
     return withError(state, [
-      "Selecione um JSON válido e um vídeo MP4 antes de criar o primeiro corte.",
+      "Selecione um JSON válido e um vídeo MP4 antes de criar os cortes.",
     ]);
   }
 
@@ -69,11 +72,20 @@ function startExecution(state) {
     phase: PHASES.RUNNING,
     errors: [],
     logs: [
-      "Iniciando criação somente do primeiro corte.",
+      "Iniciando criação dos cortes em ordem.",
       `JSON: ${state.jsonInput.name} (${state.jsonInput.cuts.length} cortes).`,
       `Vídeo: ${state.videoInput.name}.`,
       "Estado de entrada validado.",
     ],
+    progress: { current: 0, total: state.jsonInput.cuts.length },
+  };
+}
+
+function updateExecutionProgress(state, current, total, logMessage) {
+  return {
+    ...state,
+    progress: { current, total },
+    logs: logMessage ? [...state.logs, logMessage] : state.logs,
   };
 }
 
@@ -81,7 +93,7 @@ function finishExecution(state, operationLogs) {
   return {
     ...state,
     phase: derivePhase(state.jsonInput, state.videoInput),
-    logs: [...state.logs, ...operationLogs, "Criação do primeiro corte concluída."],
+    logs: [...state.logs, ...operationLogs, "Criação dos cortes concluída."],
   };
 }
 
@@ -90,6 +102,7 @@ module.exports = {
   createInitialState,
   finishExecution,
   startExecution,
+  updateExecutionProgress,
   withError,
   withJsonInput,
   withVideoInput,

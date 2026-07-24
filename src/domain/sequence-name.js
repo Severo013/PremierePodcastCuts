@@ -19,6 +19,19 @@ function createCutSequenceName(cutName, cutNumber = 1) {
   return `${prefix} - ${sanitizeSequenceName(cutName)}`;
 }
 
+function createCutSequenceNames(cuts) {
+  return cuts.map((cut, index) => createCutSequenceName(cut.name, index + 1));
+}
+
+function findSequenceNameConflicts(sequenceNames, expectedNames) {
+  const normalizedExistingNames = new Set(
+    sequenceNames.map((name) => name.toLowerCase()),
+  );
+  return expectedNames.filter((name) =>
+    normalizedExistingNames.has(name.toLowerCase()),
+  );
+}
+
 function hasSequenceNameConflict(sequenceNames, expectedName) {
   const normalizedExpectedName = expectedName.toLowerCase();
   return sequenceNames.some(
@@ -28,7 +41,9 @@ function hasSequenceNameConflict(sequenceNames, expectedName) {
 
 module.exports = {
   createCutSequenceName,
+  createCutSequenceNames,
   createMasterSequenceName,
+  findSequenceNameConflicts,
   hasSequenceNameConflict,
   sanitizeSequenceName,
 };

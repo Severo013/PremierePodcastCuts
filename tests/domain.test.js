@@ -4,7 +4,9 @@ const { parseTimestamp } = require("../src/domain/timestamp");
 const { parseCutsJson } = require("../src/domain/cuts-parser");
 const {
   createCutSequenceName,
+  createCutSequenceNames,
   createMasterSequenceName,
+  findSequenceNameConflicts,
   hasSequenceNameConflict,
   sanitizeSequenceName,
 } = require("../src/domain/sequence-name");
@@ -13,6 +15,7 @@ const {
   createInitialState,
   finishExecution,
   startExecution,
+  updateExecutionProgress,
   withError,
   withJsonInput,
   withVideoInput,
@@ -51,6 +54,22 @@ assert.strictEqual(
   "00_MASTER - Episódio IA",
 );
 assert.strictEqual(createCutSequenceName("Primeiro: corte", 1), "01 - Primeiro corte");
+assert.deepStrictEqual(
+  createCutSequenceNames([
+    { name: "Primeiro" },
+    { name: "Segundo" },
+    { name: "Décimo" },
+  ]),
+  ["01 - Primeiro", "02 - Segundo", "03 - Décimo"],
+);
+assert.strictEqual(createCutSequenceName("Décimo", 10), "10 - Décimo");
+assert.deepStrictEqual(
+  findSequenceNameConflicts(
+    ["01 - primeiro", "03 - Terceiro"],
+    ["01 - Primeiro", "02 - Segundo", "03 - Terceiro"],
+  ),
+  ["01 - Primeiro", "03 - Terceiro"],
+);
 assert.strictEqual(
   hasSequenceNameConflict(
     ["Sequência 01", "00_master - episódio ia"],
@@ -103,6 +122,15 @@ assert.strictEqual(readyState.phase, PHASES.READY);
 const runningState = startExecution(readyState);
 assert.strictEqual(runningState.phase, PHASES.RUNNING);
 assert.strictEqual(runningState.logs.length, 4);
+assert.deepStrictEqual(runningState.progress, { current: 0, total: 1 });
+const progressedState = updateExecutionProgress(
+  runningState,
+  1,
+  1,
+  "Progresso 1/1.",
+);
+assert.deepStrictEqual(progressedState.progress, { current: 1, total: 1 });
+assert.strictEqual(progressedState.logs.at(-1), "Progresso 1/1.");
 assert.strictEqual(
   finishExecution(runningState, ["Mídia localizada."]).phase,
   PHASES.READY,

@@ -1,7 +1,8 @@
 const app = require("premierepro");
 const {
-  createCutSequenceName,
+  createCutSequenceNames,
   createMasterSequenceName,
+  findSequenceNameConflicts,
   hasSequenceNameConflict,
 } = require("../domain/sequence-name");
 
@@ -202,7 +203,7 @@ async function trimTrackGroup(
           compoundAction.addAction(itemToTrim.createSetStartAction(startTime));
           compoundAction.addAction(itemToTrim.createSetEndAction(endTime));
         },
-        `Aparar ${mediaType} do primeiro corte`,
+        `Aparar ${mediaType} do corte atual`,
       );
 
       const refreshedItems = await getTrackItems(
@@ -224,7 +225,7 @@ async function trimTrackGroup(
           const offset = app.TickTime.createWithSeconds(-startSeconds);
           compoundAction.addAction(itemToMove.createMoveAction(offset));
         },
-        `Mover ${mediaType} do primeiro corte para zero`,
+        `Mover ${mediaType} do corte atual para zero`,
       );
       processedItems += 1;
     }
@@ -233,34 +234,22 @@ async function trimTrackGroup(
   return processedItems;
 }
 
-async function createFirstCutSequence(projectName, firstCut) {
-  if (!firstCut) {
-    throw new Error("O JSON não contém um primeiro corte.");
-  }
-
-  const project = await getActiveProject();
-  const sequences = await project.getSequences();
-  const masterName = createMasterSequenceName(projectName);
-  const masterSequence = findSequenceByName(sequences, masterName);
-  if (!masterSequence) {
-    throw new Error(`A sequência master "${masterName}" não foi encontrada.`);
-  }
-  const masterGuid = masterSequence.guid;
-
-  const cutName = createCutSequenceName(firstCut.name, 1);
-  if (hasSequenceNameConflict(sequences.map((sequence) => sequence.name), cutName)) {
-    throw new Error(
-      `Já existe uma sequência chamada "${cutName}". Nenhum corte foi criado.`,
-    );
-  }
-
-  const settings = await masterSequence.getSettings();
+async function createCutSequence(
+  project,
+  masterGuid,
+  masterName,
+  cut,
+  cutNumber,
+  cutName,
+) {
+  const masterForSettings = await project.getSequence(masterGuid);
+  const settings = await masterForSettings.getSettings();
   const frameRate = await settings.getVideoFrameRate();
   const alignedStart = app.TickTime.createWithSeconds(
-    firstCut.startSeconds,
+    cut.startSeconds,
   ).alignToNearestFrame(frameRate);
   const alignedEnd = app.TickTime.createWithSeconds(
-    firstCut.endSeconds,
+    cut.endSeconds,
   ).alignToNearestFrame(frameRate);
 
   if (alignedEnd.seconds <= alignedStart.seconds) {
@@ -314,7 +303,7 @@ async function createFirstCutSequence(projectName, firstCut) {
     (compoundAction) => {
       compoundAction.addAction(sequenceItem.createSetNameAction(cutName));
     },
-    "Nomear o primeiro corte",
+    "Nomear o corte atual",
   );
 
   const subsequenceForEnd = await project.getSequence(subsequenceGuid);
@@ -327,8 +316,9 @@ async function createFirstCutSequence(projectName, firstCut) {
   return {
     sequenceName: cutName,
     masterSequenceName: masterName,
-    sourceStartSeconds: firstCut.startSeconds,
-    sourceEndSeconds: firstCut.endSeconds,
+    cutNumber,
+    sourceStartSeconds: cut.startSeconds,
+    sourceEndSeconds: cut.endSeconds,
     alignedStartSeconds,
     alignedEndSeconds,
     expectedDurationSeconds: alignedDurationSeconds,
@@ -338,4 +328,89 @@ async function createFirstCutSequence(projectName, firstCut) {
   };
 }
 
-module.exports = { createFirstCutSequence, createMasterSequence };
+function createExecutionError(message, report) {
+  const error = new Error(message);
+  error.report = report;
+  return error;
+}
+
+async function createCutSequences(projectName, cuts, onProgress = () => {}) {
+  const requested = cuts.length;
+  const report = {
+    requested,
+    created: [],
+    failed: [],
+    masterSequenceName: createMasterSequenceName(projectName),
+  };
+
+  if (requested === 0) {
+    throw createExecutionError("O JSON não contém cortes.", report);
+  }
+
+  const project = await getActiveProject();
+  const sequences = await project.getSequences();
+  const masterSequence = findSequenceByName(
+    sequences,
+    report.masterSequenceName,
+  );
+  if (!masterSequence) {
+    throw createExecutionError(
+      `A sequência master "${report.masterSequenceName}" não foi encontrada.`,
+      report,
+    );
+  }
+
+  const cutNames = createCutSequenceNames(cuts);
+  const conflicts = findSequenceNameConflicts(
+    sequences.map((sequence) => sequence.name),
+    cutNames,
+  );
+  if (conflicts.length > 0) {
+    report.failed = conflicts.map((sequenceName) => ({
+      sequenceName,
+      message: "Conflito de nome detectado antes da execução.",
+    }));
+    throw createExecutionError(
+      `Conflitos detectados: ${conflicts.join(", ")}. Nenhuma sequência foi criada.`,
+      report,
+    );
+  }
+
+  const masterGuid = masterSequence.guid;
+  onProgress({ current: 0, total: requested, sequenceName: null });
+
+  for (let index = 0; index < cuts.length; index += 1) {
+    const cut = cuts[index];
+    const sequenceName = cutNames[index];
+    try {
+      const result = await createCutSequence(
+        project,
+        masterGuid,
+        report.masterSequenceName,
+        cut,
+        index + 1,
+        sequenceName,
+      );
+      report.created.push(result);
+      onProgress({
+        current: index + 1,
+        total: requested,
+        sequenceName,
+      });
+    } catch (error) {
+      report.failed.push({
+        cutNumber: index + 1,
+        sequenceName,
+        message: error.message || "Falha inesperada.",
+      });
+      throw createExecutionError(
+        `Falha no corte ${index + 1}/${requested} ("${sequenceName}"): ${error.message || "erro inesperado"}`,
+        report,
+      );
+    }
+  }
+
+  return report;
+}
+
+module.exports = { createCutSequences, createMasterSequence };

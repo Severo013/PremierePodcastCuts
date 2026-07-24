@@ -45,13 +45,16 @@ Developer Tool para recarregar o painel.
 1. Abra o painel no Premiere.
 2. Clique em `Selecionar JSON` e selecione `samples/cuts.example.json`.
 3. Clique em `Selecionar MP4` e escolha um vídeo de teste.
-4. Confirme que o painel mostra os dois nomes e habilita `Criar primeiro corte`.
+4. Confirme que o painel mostra os dois nomes e habilita `Criar cortes`.
 5. Abra o projeto que já contém a master validada na Fase 4.
-6. Clique em `Criar primeiro corte` e confira o relatório de duração no log.
+6. Clique em `Criar cortes` e acompanhe o progresso `atual/total`.
+7. Confira no relatório os cortes solicitados, criados e as falhas.
 
-Nesta fase, o botão usa a sequência `00_MASTER - <projectName>` existente para
-criar apenas `01 - <nome do primeiro corte>`. Os demais itens de `cuts` não são
-processados, e o projeto não é salvo automaticamente.
+O botão usa a sequência `00_MASTER - <projectName>` existente e processa todos
+os itens de `cuts` na ordem do JSON, gerando `01 - ...`, `02 - ...`, `03 - ...`.
+Todos os conflitos são verificados antes da primeira criação. Um erro durante o
+processamento interrompe os cortes seguintes, e o projeto não é salvo
+automaticamente.
 
 ## Executar os testes de domínio
 

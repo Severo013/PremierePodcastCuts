@@ -193,8 +193,8 @@ revisada: a subsequência ainda preserva as configurações da master, mas seus
 ### Limitações conhecidas
 
 - a inclusão do frame no ponto Out precisa ser medida no Premiere;
-- o recorte e deslocamento sincronizado dos track items de áudio e vídeo precisa
-  ser validado no runtime;
+- o recorte e deslocamento sincronizado dos track items de áudio e vídeo foi
+  validado manualmente na Fase 5;
 - se a subsequência for criada e a transação de rename falhar, a API não oferece atomicidade entre as duas operações assíncronas.
 
 ### Correção confirmada em teste da Fase 5
@@ -223,6 +223,18 @@ GUID imediatamente antes de `lockedAccess`. Como zerar a timeline é condicional
 à disponibilidade da API nesta fase, a prova deixou de modificar o zero point.
 O valor real continua sendo lido por `getZeroPoint()` e mostrado no relatório; a
 duração medida passou a ser `getEndTime() - getZeroPoint()`.
+
+### Generalização da Fase 6
+
+- os nomes de todos os cortes são calculados e comparados, sem distinção de
+  maiúsculas, com `Project.getSequences()` antes da primeira modificação;
+- os cortes são processados sequencialmente na ordem do array;
+- cada iteração reutiliza a estratégia validada na Fase 5 e relocaliza os
+  objetos do DOM necessários;
+- uma falha registra o corte atual no relatório e interrompe imediatamente os
+  cortes restantes; sequências concluídas anteriormente não são removidas;
+- o callback de progresso recebe `current`, `total` e o nome criado, sem acessar
+  diretamente elementos da interface a partir do adapter.
 
 Fontes oficiais:
 
