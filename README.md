@@ -43,12 +43,13 @@ Developer Tool para recarregar o painel.
 ## Testar o painel
 
 1. Abra o painel no Premiere.
-2. Clique em `Selecionar JSON`.
-3. Selecione `samples/cuts.example.json`.
-4. Confirme que o painel mostra o arquivo, o projeto e os três cortes com suas
-   durações.
+2. Clique em `Selecionar JSON` e selecione `samples/cuts.example.json`.
+3. Clique em `Selecionar MP4` e escolha um vídeo de teste.
+4. Confirme que o painel mostra os dois nomes e habilita `Criar cortes`.
+5. Clique em `Criar cortes` e confira o log da simulação.
 
-O teste não acessa nem modifica o projeto aberto.
+O teste apenas valida o estado da interface: não acessa nem modifica o projeto
+aberto.
 
 ## Executar os testes de domínio
 

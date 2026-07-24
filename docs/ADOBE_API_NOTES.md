@@ -48,6 +48,14 @@ if (file) {
 - `File.read()` retorna uma `Promise<string|ArrayBuffer>` e usa UTF-8 por padrão;
 - fonte: `https://developer.adobe.com/premiere-pro/uxp/uxp-api/reference-js/modules/uxp/persistent-file-storage/file`.
 
+Na Fase 2, o mesmo picker é usado para vídeo com `types: ["mp4"]`. A
+referência `File` retornada é mantida em memória, e o caminho nativo é obtido
+por `localFileSystem.getNativePath(file)`. Não é usado acesso direto por caminho
+nem permissão `fullAccess`.
+
+Fonte oficial:
+`https://developer.adobe.com/premiere-pro/uxp/resources/recipes/filesystem-operations/`.
+
 ### Permissão
 
 Para selecionar arquivos do usuário, declarar no `manifest.json`:

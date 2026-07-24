@@ -11,9 +11,28 @@ async function selectJsonFile() {
   }
 
   return {
+    entry: file,
     name: file.name,
+    nativePath: localFileSystem.getNativePath(file),
     text: await file.read(),
   };
 }
 
-module.exports = { selectJsonFile };
+async function selectVideoFile() {
+  const file = await localFileSystem.getFileForOpening({
+    allowMultiple: false,
+    types: ["mp4"],
+  });
+
+  if (!file) {
+    return null;
+  }
+
+  return {
+    entry: file,
+    name: file.name,
+    nativePath: localFileSystem.getNativePath(file),
+  };
+}
+
+module.exports = { selectJsonFile, selectVideoFile };

@@ -32,8 +32,21 @@ button {
   align-self: flex-start;
 }
 
+.phase {
+  margin: -8px 0 0;
+  color: var(--uxp-host-text-color-secondary, #c7c7c7);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selection,
 .summary,
-.errors {
+.errors,
+.log {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -80,4 +93,8 @@ li + li {
 .errors {
   color: var(--uxp-host-text-color-negative, #ff8a80);
   border-color: currentColor;
+}
+
+.log {
+  min-height: 70px;
 }

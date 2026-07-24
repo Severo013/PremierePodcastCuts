@@ -2,6 +2,15 @@ const assert = require("node:assert");
 const { readFileSync } = require("node:fs");
 const { parseTimestamp } = require("../src/domain/timestamp");
 const { parseCutsJson } = require("../src/domain/cuts-parser");
+const {
+  PHASES,
+  createInitialState,
+  finishSimulation,
+  startSimulation,
+  withError,
+  withJsonInput,
+  withVideoInput,
+} = require("../src/application/input-state");
 
 function createDocument(cuts) {
   return JSON.stringify({
@@ -52,6 +61,36 @@ assert.ok(
   parseCutsJson(createDocument([createCut({ end: "00:00:10.000" })])).errors
     .length > 0,
 );
+
+const initialState = createInitialState();
+assert.strictEqual(initialState.phase, PHASES.IDLE);
+
+const jsonSelectedState = withJsonInput(initialState, {
+  name: "cuts.json",
+  cuts: valid.cuts,
+});
+assert.strictEqual(jsonSelectedState.phase, PHASES.PARTIAL);
+
+const readyState = withVideoInput(jsonSelectedState, {
+  name: "episode.mp4",
+});
+assert.strictEqual(readyState.phase, PHASES.READY);
+
+const runningState = startSimulation(readyState);
+assert.strictEqual(runningState.phase, PHASES.RUNNING);
+assert.strictEqual(runningState.logs.length, 4);
+assert.strictEqual(finishSimulation(runningState).phase, PHASES.READY);
+
+const invalidExecution = startSimulation(initialState);
+assert.strictEqual(invalidExecution.phase, PHASES.ERROR);
+assert.ok(invalidExecution.errors.length > 0);
+
+const recoveredState = withVideoInput(
+  withError(readyState, ["Erro de teste"]),
+  readyState.videoInput,
+);
+assert.strictEqual(recoveredState.phase, PHASES.READY);
+assert.deepStrictEqual(recoveredState.errors, []);
 assert.ok(
   parseCutsJson(
     createDocument([createCut(), createCut({ id: "1", name: "Duplicado" })]),
