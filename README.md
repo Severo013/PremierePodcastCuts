@@ -28,6 +28,38 @@ O MVP não aplica fades, tratamento de áudio nem exportação automática.
 - Developer Mode habilitado no Premiere;
 - Projeto inicial criado com o template `premierepro-quick-starter`.
 
+## Carregar o plugin no Premiere
+
+1. Abra o Adobe Premiere e mantenha-o em execução.
+2. Abra o UXP Developer Tool.
+3. Clique em `Add Plugin`.
+4. Selecione o arquivo `manifest.json` na raiz deste repositório.
+5. Na linha do plugin `PremierePodcastCuts`, clique em `Load`.
+6. No Premiere, abra `Window > UXP Plugins > PremierePro Starter Panel Project`.
+
+Depois de alterar HTML, CSS ou JavaScript, clique em `Reload` no UXP
+Developer Tool para recarregar o painel.
+
+## Testar a Fase 0
+
+1. Abra o painel no Premiere.
+2. Confirme que o texto `Painel carregado. Clique no botão para testar.`
+   está visível.
+3. Clique em `Testar painel`.
+4. Confirme que o texto muda para
+   `Teste concluído: o painel está respondendo.`.
+
+O teste não seleciona arquivos e não acessa nem modifica o projeto aberto.
+
+## Depurar
+
+1. No UXP Developer Tool, localize o plugin carregado.
+2. Clique em `Debug` para abrir o Developer Tools do painel.
+3. Selecione a aba `Console` para consultar erros e mensagens.
+4. Repita o teste do botão com o console aberto.
+
+Para a Fase 0, o resultado esperado é nenhum erro no console.
+
 ## Como usar estes documentos com o Codex
 
 1. Coloque todos os arquivos deste pacote na raiz do repositório.
