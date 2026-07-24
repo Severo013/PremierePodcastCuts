@@ -21,9 +21,16 @@ const app = require("premierepro");
 
 ### Projeto ativo
 
-A referência atual documenta acesso assíncrono por meio da classe `Project`.
+Acesso confirmado na referência oficial 25.6+:
 
-A assinatura exata deve ser confirmada no SDK instalado antes da implementação.
+```js
+const app = require("premierepro");
+const project = await app.Project.getActiveProject();
+```
+
+- assinatura: `Project.getActiveProject(): Promise<Project>`;
+- a implementação deve tratar retorno vazio quando não houver projeto ativo;
+- fonte: `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project`.
 
 ### File picker
 
@@ -76,22 +83,33 @@ Preencher durante as fases 3 a 6.
 
 ### Importação de mídia
 
-- método:
-- classe:
-- assinatura:
-- retorno:
-- versão mínima:
-- fonte oficial:
-- comportamento testado:
+- método: `importFiles`;
+- classe: `Project`;
+- assinatura: `importFiles(filePaths: string[], suppressUI: boolean, targetBin: ProjectItem, asNumberedStills: boolean): Promise<boolean>`;
+- retorno: `true` quando a importação é aceita/concluída com sucesso;
+- bin raiz: `Project.getRootItem(): Promise<FolderItem>`;
+- filhos do bin: `FolderItem.getItems(): Promise<ProjectItem[]>`;
+- versão mínima: 25.6;
+- fonte oficial: `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project` e `https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/folderitem`;
+- comportamento testado: pendente de teste manual no Premiere.
+
+`Project.importFiles` é documentado como operação assíncrona direta. A
+referência não apresenta uma Action equivalente para importação; a Fase 3 usa o
+método diretamente e aguarda sua `Promise`, sem chamar `Project.save()`.
 
 ### Localização por media path
 
-- método:
-- classe:
-- assinatura:
-- retorno:
-- versão mínima:
-- comportamento testado:
+- descoberta corrigida após teste no Premiere: `findItemsMatchingMediaPath` não é um método estático de `ClipProjectItem` no runtime testado;
+- a declaração TypeScript oficial define o método em uma instância `ClipProjectItem`, embora a página web o apresente na seção de métodos estáticos;
+- busca adotada: percorrer `FolderItem.getItems(): Promise<ProjectItem[]>` recursivamente a partir de `Project.getRootItem()`;
+- identificação: `ProjectItem.TYPE_BIN` e os tipos de item com potencial de mídia `TYPE_CLIP`, `TYPE_FILE` e `TYPE_COMPOUND`;
+- conversão de bin: `FolderItem.cast(projectItem: ProjectItem): FolderItem`;
+- conversão: `ClipProjectItem.cast(projectItem: ProjectItem): ClipProjectItem`;
+- caminho exato: `ClipProjectItem.getMediaFilePath(): Promise<string>`;
+- versão mínima: 25.6;
+- fonte oficial prioritária: `https://github.com/adobe/premierepro-types/blob/main/src/premierepro.d.ts`;
+- observação: o adapter confirma igualdade normalizada do caminho retornado antes de reutilizar;
+- comportamento testado: pendente de teste manual no Premiere.
 
 ### Criação de sequência pela mídia
 

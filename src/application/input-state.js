@@ -53,10 +53,11 @@ function withError(state, errors, options = {}) {
     jsonInput: options.clearJson ? null : state.jsonInput,
     videoInput: options.clearVideo ? null : state.videoInput,
     errors,
+    logs: options.logs || state.logs,
   };
 }
 
-function startSimulation(state) {
+function startExecution(state) {
   if (!state.jsonInput || !state.videoInput) {
     return withError(state, [
       "Selecione um JSON válido e um vídeo MP4 antes de criar os cortes.",
@@ -68,27 +69,27 @@ function startSimulation(state) {
     phase: PHASES.RUNNING,
     errors: [],
     logs: [
-      "Iniciando simulação.",
+      "Iniciando preparação da mídia.",
       `JSON: ${state.jsonInput.name} (${state.jsonInput.cuts.length} cortes).`,
       `Vídeo: ${state.videoInput.name}.`,
-      "Estado validado. Nenhuma alteração foi feita no projeto.",
+      "Estado de entrada validado.",
     ],
   };
 }
 
-function finishSimulation(state) {
+function finishExecution(state, operationLogs) {
   return {
     ...state,
     phase: derivePhase(state.jsonInput, state.videoInput),
-    logs: [...state.logs, "Simulação concluída."],
+    logs: [...state.logs, ...operationLogs, "Preparação da mídia concluída."],
   };
 }
 
 module.exports = {
   PHASES,
   createInitialState,
-  finishSimulation,
-  startSimulation,
+  finishExecution,
+  startExecution,
   withError,
   withJsonInput,
   withVideoInput,

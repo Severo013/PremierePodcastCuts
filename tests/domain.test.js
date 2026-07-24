@@ -5,8 +5,8 @@ const { parseCutsJson } = require("../src/domain/cuts-parser");
 const {
   PHASES,
   createInitialState,
-  finishSimulation,
-  startSimulation,
+  finishExecution,
+  startExecution,
   withError,
   withJsonInput,
   withVideoInput,
@@ -76,12 +76,15 @@ const readyState = withVideoInput(jsonSelectedState, {
 });
 assert.strictEqual(readyState.phase, PHASES.READY);
 
-const runningState = startSimulation(readyState);
+const runningState = startExecution(readyState);
 assert.strictEqual(runningState.phase, PHASES.RUNNING);
 assert.strictEqual(runningState.logs.length, 4);
-assert.strictEqual(finishSimulation(runningState).phase, PHASES.READY);
+assert.strictEqual(
+  finishExecution(runningState, ["Mídia localizada."]).phase,
+  PHASES.READY,
+);
 
-const invalidExecution = startSimulation(initialState);
+const invalidExecution = startExecution(initialState);
 assert.strictEqual(invalidExecution.phase, PHASES.ERROR);
 assert.ok(invalidExecution.errors.length > 0);
 

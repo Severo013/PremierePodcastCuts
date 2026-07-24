@@ -3,11 +3,12 @@ const {
   selectVideoFile,
 } = require("./src/infrastructure/file-picker");
 const { parseCutsJson } = require("./src/domain/cuts-parser");
+const { prepareMedia } = require("./src/infrastructure/premiere-adapter");
 const {
   PHASES,
   createInitialState,
-  finishSimulation,
-  startSimulation,
+  finishExecution,
+  startExecution,
   withError,
   withJsonInput,
   withVideoInput,
@@ -51,7 +52,7 @@ function formatDuration(seconds) {
 
 function getStatusText(currentState) {
   if (currentState.phase === PHASES.RUNNING) {
-    return "Simulando a criação dos cortes...";
+    return "Localizando ou importando o vídeo...";
   }
 
   if (currentState.phase === PHASES.ERROR) {
@@ -160,7 +161,7 @@ async function handleVideoSelection() {
 }
 
 async function handleCreateCuts() {
-  state = startSimulation(state);
+  state = startExecution(state);
   render();
 
   try {
@@ -168,14 +169,23 @@ async function handleCreateCuts() {
       return;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    const result = await prepareMedia(state.videoInput.nativePath);
+    state = finishExecution(state, [
+      `Projeto ativo: ${result.projectName}.`,
+      result.imported
+        ? `Mídia importada: ${result.itemName}.`
+        : `Mídia já existente reutilizada: ${result.itemName}.`,
+      `Caminho confirmado: ${result.mediaPath}.`,
+      "Nenhuma sequência foi criada e o projeto não foi salvo automaticamente.",
+    ]);
   } catch (error) {
-    console.error("Falha durante a simulação.", error);
-    state = withError(state, ["A simulação falhou inesperadamente."]);
+    console.error("Falha ao localizar ou importar a mídia.", error);
+    state = withError(
+      state,
+      [error.message || "Falha inesperada ao preparar a mídia."],
+      { logs: [...state.logs, "A preparação da mídia falhou."] },
+    );
   } finally {
-    if (state.phase === PHASES.RUNNING) {
-      state = finishSimulation(state);
-    }
     render();
   }
 }

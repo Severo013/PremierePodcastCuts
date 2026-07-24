@@ -46,10 +46,12 @@ Developer Tool para recarregar o painel.
 2. Clique em `Selecionar JSON` e selecione `samples/cuts.example.json`.
 3. Clique em `Selecionar MP4` e escolha um vídeo de teste.
 4. Confirme que o painel mostra os dois nomes e habilita `Criar cortes`.
-5. Clique em `Criar cortes` e confira o log da simulação.
+5. Abra um projeto no Premiere.
+6. Clique em `Criar cortes` e confira no log se a mídia foi reutilizada ou
+   importada.
 
-O teste apenas valida o estado da interface: não acessa nem modifica o projeto
-aberto.
+Nesta fase, o botão pode importar o MP4 no bin raiz do projeto. Ele ainda não cria
+sequências e não salva o projeto automaticamente.
 
 ## Executar os testes de domínio
 
